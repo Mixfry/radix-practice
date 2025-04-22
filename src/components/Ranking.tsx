@@ -1,0 +1,310 @@
+import React, { useState, useEffect } from "react";
+import { RankingItem } from "../types/ranking";
+import { getRankingData } from "../utils/rankingUtils";
+import { formatTime } from "../utils/timeUtils";
+
+interface RankingListProps {
+  className?: string;
+}
+
+type SortColumn = "rank" | "name" | "correct" | "score" | "time";
+type SortDirection = "asc" | "desc";
+
+interface RankedItem extends RankingItem {
+  rank: number;
+}
+
+export const RankingList: React.FC<RankingListProps> = ({ className }) => {
+  const [rankings, setRankings] = useState<RankedItem[]>([]);
+  const [filteredRankings, setFilteredRankings] = useState<RankedItem[]>([]);
+  
+  const [modeFilter, setModeFilter] = useState<string | null>(null);
+  const [questionCountFilter, setQuestionCountFilter] = useState<string>("10問");
+  const [difficultyFilter, setDifficultyFilter] = useState<string | null>(null);
+  
+  const [sortColumn, setSortColumn] = useState<SortColumn>("score");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  
+  const modes = [
+    "2進数から10進数",
+    "10進数から2進数",
+    "10進数から16進数",
+    "16進数から2進数",
+    "16進数から10進数",
+  ];
+  
+  const questionCounts = ["10問", "タイムアタック"];
+  
+  const difficultyLevels = [
+    { id: "beginner", displayName: "初級" },
+    { id: "intermediate", displayName: "中級" },
+    { id: "expert", displayName: "上級" }
+  ];
+  
+  useEffect(() => {
+    const rankingData = getRankingData();
+    
+    const rankedData = rankingData
+      .sort((a, b) => b.score - a.score)
+      .map((item, index) => ({
+        ...item,
+        rank: index + 1
+      }));
+    
+    setRankings(rankedData);
+    setFilteredRankings(rankedData);
+  }, []);
+  
+  useEffect(() => {
+    let result = [...rankings];
+    
+    if (modeFilter) {
+      result = result.filter(item => item.mode === modeFilter);
+    }
+    
+    if (questionCountFilter) {
+      result = result.filter(item => {
+        if (questionCountFilter === "10問") {
+          return item.totalQuestions === 10;
+        } else {
+          return item.totalQuestions !== 10;
+        }
+      });
+    }
+    
+    if (difficultyFilter) {
+      result = result.filter(item => item.difficulty === difficultyFilter);
+    }
+    
+    setFilteredRankings(result);
+  }, [rankings, modeFilter, questionCountFilter, difficultyFilter]);
+  
+  const toggleModeFilter = (mode: string) => {
+    if (modeFilter === mode) {
+      setModeFilter(null);
+    } else {
+      setModeFilter(mode);
+    }
+  };
+  
+  const setQuestionCountFilterValue = (count: string) => {
+    setQuestionCountFilter(count);
+  };
+  
+  const toggleDifficultyFilter = (level: string) => {
+    if (difficultyFilter === level) {
+      setDifficultyFilter(null);
+    } else {
+      setDifficultyFilter(level);
+    }
+  };
+  
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("desc");
+    }
+  };
+  
+  const sortedRankings = [...filteredRankings].sort((a, b) => {
+    let compareValueA, compareValueB;
+    
+    switch (sortColumn) {
+      case "rank":
+        compareValueA = a.score;
+        compareValueB = b.score;
+        if (sortDirection === "desc") {
+          return compareValueB - compareValueA; 
+        } else {
+          return compareValueA - compareValueB;
+        }
+      case "name":
+        compareValueA = a.name.toLowerCase();
+        compareValueB = b.name.toLowerCase();
+        break;
+      case "correct":
+        compareValueA = a.correctAnswers !== undefined ? a.correctAnswers / (a.totalQuestions || 1) : 0;
+        compareValueB = b.correctAnswers !== undefined ? b.correctAnswers / (b.totalQuestions || 1) : 0;
+        break;
+      case "score":
+        compareValueA = a.score;
+        compareValueB = b.score;
+        break;
+      case "time":
+        compareValueA = a.time;
+        compareValueB = b.time;
+        if (sortDirection === "desc") {
+          return compareValueA - compareValueB; 
+        } else {
+          return compareValueB - compareValueA;
+        }
+      default:
+        return 0;
+    }
+    
+    if (compareValueA < compareValueB) {
+      return sortDirection === "asc" ? -1 : 1;
+    }
+    if (compareValueA > compareValueB) {
+      return sortDirection === "asc" ? 1 : -1;
+    }
+    return 0;
+  });
+  
+  if (rankings.length === 0) {
+    return <p className="text-center text-gray-500">まだランキングデータがありません</p>;
+  }
+  
+  const getSortIcon = (column: SortColumn) => {
+    if (sortColumn === column) {
+      return sortDirection === "asc" ? "↑" : "↓";
+    }
+    return null;
+  };
+  
+  return (
+    <div className={`${className || ""}`}>
+      <div className="mb-4">
+        <h3 className="text-sm font-medium mb-2">ジャンルでフィルタ</h3>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {modes.map(mode => (
+            <button
+              key={mode}
+              onClick={() => toggleModeFilter(mode)}
+              className={`px-2 py-1 text-xs rounded-full transition-colors ${
+                modeFilter === mode 
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-200 hover:bg-gray-300 text-gray-800"
+              }`}
+            >
+              {mode}
+            </button>
+          ))}
+        </div>
+        
+        <h3 className="text-sm font-medium mb-2">モードでフィルタ</h3>
+        <div className="flex flex-wrap gap-4 mb-3">
+          {questionCounts.map(count => (
+            <label
+              key={count}
+              className="flex items-center text-sm cursor-pointer"
+            >
+              <input
+                type="radio"
+                name="questionCount"
+                value={count}
+                checked={questionCountFilter === count}
+                onChange={() => setQuestionCountFilterValue(count)}
+                className="mr-2"
+              />
+              {count}
+            </label>
+          ))}
+        </div>
+        
+        <h3 className="text-sm font-medium mb-2">難易度でフィルタ</h3>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {difficultyLevels.map(level => (
+            <button
+              key={level.id}
+              onClick={() => toggleDifficultyFilter(level.id)}
+              className={`px-2 py-1 text-xs rounded-full transition-colors ${
+                difficultyFilter === level.id 
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-200 hover:bg-gray-300 text-gray-800"
+              }`}
+            >
+              {level.displayName}
+            </button>
+          ))}
+        </div>
+        
+        {(modeFilter || difficultyFilter) && (
+          <div className="flex items-center justify-between mt-2 bg-blue-50 p-2 rounded">
+            <div className="text-xs text-blue-800">
+              フィルター: 
+              {modeFilter && <span className="ml-1 font-medium">{modeFilter}</span>}
+              {difficultyFilter && (
+                <span className="ml-1 font-medium">
+                  {difficultyLevels.find(level => level.id === difficultyFilter)?.displayName}
+                </span>
+              )}
+            </div>
+            <button 
+              onClick={() => {
+                setModeFilter(null);
+                setQuestionCountFilter("10問");
+                setDifficultyFilter(null);
+              }}
+              className="text-xs text-blue-600 hover:text-blue-800"
+            >
+              リセット
+            </button>
+          </div>
+        )}
+      </div>
+      
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-collapse">
+        <thead>
+          <tr className="bg-gray-100">
+            <th 
+              className="py-2 px-3 text-left cursor-pointer hover:bg-gray-200"
+              onClick={() => handleSort("rank")}
+            >
+              順位 {getSortIcon("rank")}
+            </th>
+            <th 
+              className="py-2 px-3 text-left cursor-pointer hover:bg-gray-200"
+              onClick={() => handleSort("name")}
+            >
+              名前 {getSortIcon("name")}
+            </th>
+            <th 
+              className="py-2 px-3 text-left cursor-pointer hover:bg-gray-200"
+              onClick={() => handleSort("correct")}
+            >
+              正誤 {getSortIcon("correct")}
+            </th>
+            <th 
+              className="py-2 px-3 text-left cursor-pointer hover:bg-gray-200"
+              onClick={() => handleSort("score")}
+            >
+              スコア {getSortIcon("score")}
+            </th>
+            <th 
+              className="py-2 px-3 text-left cursor-pointer hover:bg-gray-200"
+              onClick={() => handleSort("time")}
+            >
+              時間 {getSortIcon("time")}
+            </th>
+          </tr>
+        </thead>
+          <tbody>
+            {sortedRankings.map((ranking) => (
+              <tr key={ranking.rank} className={ranking.rank % 2 === 0 ? "bg-gray-50" : ""}>
+                <td className="py-2 px-3 font-bold">{ranking.rank}</td>
+                <td className="py-2 px-3">{ranking.name}</td>
+                <td className="py-2 px-3 text-center">
+                  {ranking.correctAnswers !== undefined && ranking.totalQuestions !== undefined 
+                    ? `${ranking.correctAnswers}/${ranking.totalQuestions}`
+                    : "N/A"}
+                </td>
+                <td className="py-2 px-3">{ranking.score}</td>
+                <td className="py-2 px-3">{formatTime(ranking.time)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      
+      {sortedRankings.length === 0 && (
+        <p className="text-center text-gray-500 mt-4">
+          フィルター条件に一致する記録がありません
+        </p>
+      )}
+    </div>
+  );
+};
