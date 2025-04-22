@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { GameScreen } from "../components/GameScreen";
+import { Selector } from "../components/Selector";
 import { Modal } from "../components/Modal";
 import { generateQuestions, handleInputChange, handleKeyDown } from "../utils/gameUtils";
 import { RankingList } from "../components/Ranking";
