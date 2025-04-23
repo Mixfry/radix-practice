@@ -1,11 +1,34 @@
-import { RankingItem } from "../types/ranking";
+import { RankingItem, RankingDBItem } from "../types/ranking";
 
-export const getRankingData = (): RankingItem[] => {
-  const rankingData = JSON.parse(localStorage.getItem("rankingData") || "[]") as RankingItem[];
-  return rankingData;
+export const getRankingData = async (): Promise<RankingItem[]> => {
+  try {
+    const response = await fetch('/api/rankings');
+    const result = await response.json();
+    
+    if (!result.success) {
+      console.error("ランキング取得エラー:", result.error);
+      return [];
+    }
+    
+    const rankingData = result.data.map((item: RankingDBItem) => ({
+      name: item.name,
+      score: item.score,
+      mode: item.mode,
+      difficulty: item.difficulty,
+      time: item.time,
+      date: item.created_at,
+      correctAnswers: item.correct_answers,
+      totalQuestions: item.total_questions
+    }));
+    
+    return rankingData;
+  } catch (error) {
+    console.error("ランキング取得エラー:", error);
+    return [];
+  }
 };
 
-export const saveToRanking = (
+export const saveToRanking = async (
   playerName: string,
   score: number,
   mode: string,
@@ -13,32 +36,42 @@ export const saveToRanking = (
   time: number,
   correctAnswers: number,
   totalQuestions: number
-): void => {
+): Promise<{ success: boolean; message: string }> => {
   if (!playerName.trim()) {
     throw new Error("名前を入力してください");
   }
 
-  const rankingData = getRankingData();
-  
-  rankingData.push({
-    name: playerName,
-    score,
-    mode,
-    difficulty,
-    time,
-    date: new Date().toISOString(),
-    correctAnswers,
-    totalQuestions
-  });
-  
-  rankingData.sort((a: RankingItem, b: RankingItem) => b.score - a.score);
-  
-  const topRankings = rankingData.slice(0, 10);
-  
-  localStorage.setItem("rankingData", JSON.stringify(topRankings));
+  try {
+    const response = await fetch('/api/rankings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: playerName,
+        score,
+        mode,
+        difficulty,
+        time,
+        correctAnswers,
+        totalQuestions
+      }),
+    });
+    
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.message || result.error);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error("ランキング保存エラー:", error);
+    throw error;
+  }
 };
 
-export const handleRankingRegistration = (
+export const handleRankingRegistration = async (
   playerName: string,
   score: number,
   mode: string,
@@ -50,9 +83,9 @@ export const handleRankingRegistration = (
   setIsResultModalOpen: (isOpen: boolean) => void,
   setGameStarted: (isStarted: boolean) => void,
   setPlayerName: (name: string) => void
-) => {
+): Promise<boolean> => {
   try {
-    saveToRanking(
+    const result = await saveToRanking(
       playerName,
       score,
       mode,
@@ -65,10 +98,9 @@ export const handleRankingRegistration = (
     setIsNameInputModalOpen(false);
     setIsResultModalOpen(false);
     setGameStarted(false);
-    
     setPlayerName("");
     
-    alert("ランキングに登録しました！");
+    alert(result.message);
     return true;
   } catch (error) {
     if (error instanceof Error) {

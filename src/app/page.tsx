@@ -47,6 +47,25 @@ export default function Home() {
   const [mistakes, setMistakes] = useState(0);
 
   useEffect(() => {
+    const setupDatabase = async () => {
+      try {
+        const checkResponse = await fetch('/api/rankings/check');
+        const checkData = await checkResponse.json();
+        
+        if (checkData.success && !checkData.tableExists) {
+          const setupResponse = await fetch('/api/rankings/setup');
+          const setupData = await setupResponse.json();
+          console.log('DB初期化: ', setupData);
+        }
+      } catch (error) {
+        console.error('DB初期化エラー:', error);
+      }
+    };
+  
+    setupDatabase();
+  }, []);
+
+  useEffect(() => {
     const savedMode = localStorage.getItem("selectedMode");
     const savedQuestionCount = localStorage.getItem("selectedQuestionCount");
     const savedDifficultyLevel = localStorage.getItem("selectedDifficultyLevel");
@@ -306,14 +325,22 @@ export default function Home() {
           ) : (
             <p className="text-lg mt-2">正誤: {score}/{questions.length}</p>
           )}
-          <p className="text-lg mt-2">かかった時間: {formatTime(elapsedTime)}</p>
+          {questionCount === "タイムアタック(1分)" ? (
+            <p className="text-lg mt-2">1問あたりの時間: {
+              currentQuestionIndex > 0 
+                ? `${(60 / currentQuestionIndex).toFixed(2)}秒` 
+                : "計測不能"
+            }</p>
+          ) : (
+            <p className="text-lg mt-2">かかった時間: {formatTime(elapsedTime)}</p>
+          )}
           
-          <p className="text-xl font-bold mt-4">スコア: {getCurrentScore()}</p>
+          <p className="text-xl font-bold mt-6">スコア: {getCurrentScore()}</p>
           
           <div className="flex flex-col items-center gap-4 mt-8">
             <button
               onClick={registerToRanking}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 w-full"
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 w-full mt-4"
             >
               ランキングに登録する
             </button>

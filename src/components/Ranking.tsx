@@ -25,6 +25,9 @@ export const RankingList: React.FC<RankingListProps> = ({ className }) => {
   const [sortColumn, setSortColumn] = useState<SortColumn>("score");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  
   const modes = [
     "2進数から10進数",
     "10進数から2進数",
@@ -95,17 +98,21 @@ export const RankingList: React.FC<RankingListProps> = ({ className }) => {
   };
   
   useEffect(() => {
-    const rankingData = getRankingData();
+    const fetchRankings = async () => {
+      const rankingData = await getRankingData();
+      
+      const rankedData = rankingData
+        .sort((a, b) => b.score - a.score)
+        .map((item, index) => ({
+          ...item,
+          rank: index + 1
+        }));
+      
+      setRankings(rankedData);
+      setFilteredRankings(rankedData);
+    };
     
-    const rankedData = rankingData
-      .sort((a, b) => b.score - a.score)
-      .map((item, index) => ({
-        ...item,
-        rank: index + 1
-      }));
-    
-    setRankings(rankedData);
-    setFilteredRankings(rankedData);
+    fetchRankings();
   }, []);
   
   useEffect(() => {
@@ -130,6 +137,7 @@ export const RankingList: React.FC<RankingListProps> = ({ className }) => {
     }
     
     setFilteredRankings(result);
+    setCurrentPage(1);
   }, [rankings, modeFilter, questionCountFilter, difficultyFilter]);
   
   const toggleModeFilter = (mode: string) => {
@@ -159,6 +167,7 @@ export const RankingList: React.FC<RankingListProps> = ({ className }) => {
       setSortColumn(column);
       setSortDirection("desc");
     }
+    setCurrentPage(1);
   };
 
   const calculateRank = (index: number, totalItems: number) => {
@@ -243,6 +252,69 @@ export const RankingList: React.FC<RankingListProps> = ({ className }) => {
     }
     return 0;
   });
+  
+  const totalPages = Math.ceil(sortedRankings.length / itemsPerPage);
+  
+  const getPaginatedRankings = () => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return sortedRankings.slice(startIndex, startIndex + itemsPerPage);
+  };
+  
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+  
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+    
+    return (
+      <div className="flex justify-center mt-4 mb-4 space-x-2">
+        <button
+          onClick={() => handlePageChange(1)}
+          disabled={currentPage === 1}
+          className={`px-2 py-1 rounded ${
+            currentPage === 1 ? 'bg-gray-200 text-gray-500' : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+          }`}
+        >
+          &laquo;
+        </button>
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className={`px-2 py-1 rounded ${
+            currentPage === 1 ? 'bg-gray-200 text-gray-500' : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+          }`}
+        >
+          &lt;
+        </button>
+        
+        <span className="px-2 py-1 text-gray-700">
+          {currentPage} / {totalPages}
+        </span>
+        
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className={`px-2 py-1 rounded ${
+            currentPage === totalPages ? 'bg-gray-200 text-gray-500' : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+          }`}
+        >
+          &gt;
+        </button>
+        <button
+          onClick={() => handlePageChange(totalPages)}
+          disabled={currentPage === totalPages}
+          className={`px-2 py-1 rounded ${
+            currentPage === totalPages ? 'bg-gray-200 text-gray-500' : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+          }`}
+        >
+          &raquo;
+        </button>
+      </div>
+    );
+  };
   
   if (rankings.length === 0) {
     return <p className="text-center text-gray-500">まだランキングデータがありません</p>;
@@ -339,6 +411,8 @@ export const RankingList: React.FC<RankingListProps> = ({ className }) => {
         )}
       </div>
       
+      {renderPagination()}
+      
       <div className="overflow-x-auto">
         <table className="min-w-full border-collapse table-auto">
           <thead>
@@ -383,34 +457,39 @@ export const RankingList: React.FC<RankingListProps> = ({ className }) => {
             </tr>
           </thead>
           <tbody>
-            {sortedRankings.map((ranking, index) => (
-              <tr key={index} className={index % 2 === 0 ? "bg-gray-50" : ""}>
-                <td className="py-2 px-3 font-bold whitespace-nowrap">
-                  {calculateRank(index, sortedRankings.length)}
-                </td> 
-                <td className="py-2 px-3 whitespace-nowrap">{ranking.name}</td>
-                <td className="py-2 px-3 whitespace-nowrap">{ranking.score}</td>
-                <td className="py-2 px-3 text-center whitespace-nowrap">
-                  {ranking.correctAnswers !== undefined && ranking.totalQuestions !== undefined 
-                    ? `${ranking.correctAnswers}/${ranking.totalQuestions}`
-                    : "N/A"}
-                </td>
-                <td className="py-2 px-3 whitespace-nowrap">{getDisplayTime(ranking)}</td>
-                <td className="py-2 px-3 whitespace-nowrap">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium">{formatMode(ranking.mode)}</span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full inline-block w-fit mt-1 ${
-                      getDifficultyColor(ranking.difficulty, "bg")} ${getDifficultyColor(ranking.difficulty, "text")
-                    }`}>
-                      {getDifficultyName(ranking.difficulty)}
-                    </span>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {getPaginatedRankings().map((ranking, index) => {
+              const actualIndex = (currentPage - 1) * itemsPerPage + index;
+              return (
+                <tr key={index} className={index % 2 === 0 ? "bg-gray-50" : ""}>
+                  <td className="py-2 px-3 font-bold whitespace-nowrap">
+                    {calculateRank(actualIndex, sortedRankings.length)}
+                  </td> 
+                  <td className="py-2 px-3 whitespace-nowrap">{ranking.name}</td>
+                  <td className="py-2 px-3 whitespace-nowrap">{ranking.score}</td>
+                  <td className="py-2 px-3 text-center whitespace-nowrap">
+                    {ranking.correctAnswers !== undefined && ranking.totalQuestions !== undefined 
+                      ? `${ranking.correctAnswers}/${ranking.totalQuestions}`
+                      : "N/A"}
+                  </td>
+                  <td className="py-2 px-3 whitespace-nowrap">{getDisplayTime(ranking)}</td>
+                  <td className="py-2 px-3 whitespace-nowrap">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">{formatMode(ranking.mode)}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full inline-block w-fit mt-1 ${
+                        getDifficultyColor(ranking.difficulty, "bg")} ${getDifficultyColor(ranking.difficulty, "text")
+                      }`}>
+                        {getDifficultyName(ranking.difficulty)}
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
+      
+      {renderPagination()}
       
       {sortedRankings.length === 0 && (
         <p className="text-center text-gray-500 mt-4">
