@@ -1,14 +1,15 @@
 import { Dispatch, RefObject, SetStateAction } from "react";
 
-//モーダル開いてる時はタイマーを止めるやつ
-export const startTimer = (
-  setElapsedTime: Dispatch<SetStateAction<number>>,
-  timerRef: RefObject<NodeJS.Timeout | null>
-) => {
-  setElapsedTime(0);
+export const startTimer = (setElapsedTime: React.Dispatch<React.SetStateAction<number>>, timerRef: React.MutableRefObject<NodeJS.Timeout | null>) => {
+  if (timerRef.current) {
+    clearInterval(timerRef.current);
+  }
+  
+  const startTime = Date.now();
   timerRef.current = setInterval(() => {
-    setElapsedTime((prev) => prev + 100);
-  }, 100);
+    const currentTime = Date.now();
+    setElapsedTime(Math.floor((currentTime - startTime) / 10) * 10);
+  }, 10);
 };
 
 export const stopTimer = (

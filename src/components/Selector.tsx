@@ -18,6 +18,7 @@ export function Selector<T>({
   renderItem 
 }: SelectorProps<T>) {
   const getGridColsClass = (cols: number) => {
+    //うまく動かなかったから静的にしちゃった、良い方法ないかな
     switch (cols) {
       case 1: return "grid-cols-1";
       case 2: return "grid-cols-2";

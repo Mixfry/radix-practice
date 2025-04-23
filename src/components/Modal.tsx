@@ -17,7 +17,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, classNa
         style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
         onClick={onClose}
       ></div>
-      <div className="relative flex items-center justify-center h-full -mt-4">
+      <div className="relative flex items-center justify-center h-full">
         <div className={`p-6 rounded shadow-lg z-10 ${className || ""}`}>
           {children}
         </div>

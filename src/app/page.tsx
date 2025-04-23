@@ -4,13 +4,13 @@ import { useState, useEffect, useRef } from "react";
 import { GameScreen } from "../components/GameScreen";
 import { Selector } from "../components/Selector";
 import { Modal } from "../components/Modal";
-import { generateQuestions, handleInputChange, handleKeyDown } from "../utils/gameUtils";
+import { generateQuestions, handleInputChange, handleKeyDown } from "../utils/game";
 import { RankingList } from "../components/Ranking";
-import { RankingInputModalContent } from "../components/RankingInputModalContent";
-import { formatTime } from "../utils/timeUtils";
-import { calculateScore } from "../utils/scoreUtils";
-import { handleRankingRegistration } from "../utils/rankingUtils";
-import { startTimer, stopTimer, pauseTimer, resumeTimer } from "../utils/timerUtils";
+import { RankingInputModalContent } from "../components/RankingModal";
+import { formatTime } from "../utils/format";
+import { calculateScore } from "../utils/score";
+import { handleRankingRegistration } from "../utils/ranking";
+import { startTimer, stopTimer, pauseTimer, resumeTimer } from "../utils/stopWatch";
 
 export default function Home() {
   const modes = [
@@ -45,6 +45,7 @@ export default function Home() {
   const timerPausedAtRef = useRef<number>(0);
   const [isNameInputModalOpen, setIsNameInputModalOpen] = useState(false);
   const [playerName, setPlayerName] = useState("");
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   useEffect(() => {
     const savedMode = localStorage.getItem("selectedMode");
@@ -76,6 +77,14 @@ export default function Home() {
       alert("モード、設問数、難易度を選択してください！");
       return;
     }
+    
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setElapsedTime(0);
+    setIsTimerPaused(false);
+    
     const newQuestions = generateQuestions(mode, questionCount, difficultyLevel);
     setQuestions(newQuestions);
     setGameStarted(true);
@@ -83,20 +92,42 @@ export default function Home() {
     setScore(0);
     setFeedback(null);
     setUserAnswers([""]);
-    if (questionCount === "10問") {
-      startTimer(setElapsedTime, timerRef);
-    }
+    
+    setCountdown(3);
+    
+    const countdownInterval = setInterval(() => {
+      setCountdown(prevCount => {
+        if (prevCount === null) return null;
+        if (prevCount <= 1) {
+          clearInterval(countdownInterval);
+          if (questionCount === "10問" && !timerRef.current) {
+            startTimer(setElapsedTime, timerRef);
+          }
+          return null;
+        }
+        return prevCount - 1;
+      });
+    }, 1000);
   };
 
-  const handleAnswerSubmit = () => {
+    const handleAnswerSubmit = () => {
     const userAnswer = userAnswers.join("").replace(/\s/g, "");
-    const correctAnswer = questions[currentQuestionIndex].answer.replace(/\s/g, "");
-  
+    
+    let correctAnswer = questions[currentQuestionIndex].answer.replace(/\s/g, "");
+    
+    if (mode.includes("16進数") || (mode.includes("10進数から") && !mode.includes("2進数"))) {
+      correctAnswer = correctAnswer.toUpperCase();
+    }
+    
     if (timerRef.current) {
       pauseTimer(timerRef, setIsTimerPaused, elapsedTime, timerPausedAtRef);
     }
   
-    if (userAnswer === correctAnswer) {
+    const normalizedUserAnswer = (mode.includes("16進数") || (mode.includes("10進数から") && !mode.includes("2進数"))) 
+      ? userAnswer.toUpperCase() 
+      : userAnswer;
+    
+    if (normalizedUserAnswer === correctAnswer) {
       setScore(score + 1);
       setFeedback("正解！");
     } else {
@@ -154,9 +185,16 @@ export default function Home() {
   if (gameStarted) {
     const currentMode = modes.find((m) => m.name === mode);
     const progressPercentage = ((currentQuestionIndex + 1) / questions.length) * 100;
-
+  
     return (
       <>
+        {/* カウントダウン */}
+        {countdown !== null && (
+          <div className="fixed inset-0 flex items-center justify-center z-50">
+            <div className="text-9xl font-bold text-blue-500">{countdown}</div>
+          </div>
+        )}
+  
         {/* 進捗バー */}
         <div className="fixed top-0 left-0 w-full h-2 bg-gray-200">
           <div
@@ -164,37 +202,41 @@ export default function Home() {
             style={{ width: `${progressPercentage}%` }}
           ></div>
         </div>
-
+  
         {/* ストップウォッチ */}
         {questionCount === "10問" && (
           <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-white px-4 py-2 rounded shadow-lg flex flex-col items-center">
             <p className="text-lg font-mono">{formatTime(elapsedTime)}</p>
           </div>
         )}
-
-        <GameScreen
-          questions={questions}
-          currentQuestionIndex={currentQuestionIndex}
-          userAnswers={userAnswers}
-          handleInputChange={(value, index) =>
-            handleInputChange(value, index, userAnswers, setUserAnswers, inputRefs, currentMode?.BinaryInput || false)
-          }
-          handleKeyDown={(e, index) =>
-            handleKeyDown(
-              e, 
-              index, 
-              userAnswers, 
-              setUserAnswers, 
-              inputRefs, 
-              currentMode?.BinaryInput || false,
-            )
-          }
-          handleAnswerSubmit={handleAnswerSubmit}
-          feedback={feedback}
-          inputRefs={inputRefs}
-          isBinaryInput={currentMode?.BinaryInput || false}
-          mode={mode}
-        />
+  
+        {/* カウントダウン中は操作不可にするやつ */}
+        <div className={countdown !== null ? "pointer-events-none opacity-50" : ""}>
+          <GameScreen
+            questions={questions}
+            currentQuestionIndex={currentQuestionIndex}
+            userAnswers={userAnswers}
+            handleInputChange={(value, index) =>
+              handleInputChange(value, index, userAnswers, setUserAnswers, inputRefs, currentMode?.BinaryInput || false)
+            }
+            handleKeyDown={(e, index) =>
+              handleKeyDown(
+                e, 
+                index, 
+                userAnswers, 
+                setUserAnswers, 
+                inputRefs, 
+                currentMode?.BinaryInput || false,
+              )
+            }
+            handleAnswerSubmit={handleAnswerSubmit}
+            feedback={feedback}
+            inputRefs={inputRefs}
+            isBinaryInput={currentMode?.BinaryInput || false}
+            mode={mode}
+            countdown={countdown} 
+          />
+        </div>
 
         {/* 次へ行くやつ */}
         <Modal
@@ -226,7 +268,7 @@ export default function Home() {
           </div>
         </Modal>
 
-        {/* リザルトのモーダル */}
+        {/* リザルト画面 */}
         <Modal
           isOpen={isResultModalOpen}
           onClose={() => setIsResultModalOpen(false)}
@@ -258,7 +300,7 @@ export default function Home() {
           </div>
         </Modal>
 
-        {/* 名前入力モーダル */}
+        {/* ランキングの名前入力 */}
         <Modal
           isOpen={isNameInputModalOpen}
           onClose={() => setIsNameInputModalOpen(false)}

@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { RankingItem } from "../types/ranking";
-import { getRankingData } from "../utils/rankingUtils";
-import { formatTime } from "../utils/timeUtils";
+import { getRankingData } from "../utils/ranking";
+import { formatTime } from "../utils/format";
 
 interface RankingListProps {
   className?: string;
 }
 
-type SortColumn = "rank" | "name" | "correct" | "score" | "time";
+type SortColumn = "rank" | "name" | "correct" | "score" | "time" | "mode";
 type SortDirection = "asc" | "desc";
 
 interface RankedItem extends RankingItem {
@@ -40,6 +40,59 @@ export const RankingList: React.FC<RankingListProps> = ({ className }) => {
     { id: "intermediate", displayName: "中級" },
     { id: "expert", displayName: "上級" }
   ];
+
+  const difficultyColors = {
+    beginner: {
+      bg: "bg-green-100",
+      text: "text-green-800",
+      button: {
+        active: "bg-green-500 text-white",
+        inactive: "bg-green-100 hover:bg-green-200 text-green-800"
+      }
+    },
+    intermediate: {
+      bg: "bg-yellow-100",
+      text: "text-yellow-800",
+      button: {
+        active: "bg-yellow-500 text-white",
+        inactive: "bg-yellow-100 hover:bg-yellow-200 text-yellow-800"
+      }
+    },
+    expert: {
+      bg: "bg-red-100",
+      text: "text-red-800",
+      button: {
+        active: "bg-red-500 text-white",
+        inactive: "bg-red-100 hover:bg-red-200 text-red-800"
+      }
+    }
+  };
+
+  const getDifficultyColor = (difficultyId: string, type: "bg" | "text" | "button", isActive = false) => {
+    const colorSet = difficultyColors[difficultyId as keyof typeof difficultyColors];
+    if (!colorSet) return "";
+    
+    if (type === "button") {
+      return isActive ? colorSet.button.active : colorSet.button.inactive;
+    }
+    
+    return colorSet[type];
+  };
+
+  const formatMode = (mode: string): string => {
+    if (mode.includes("から")) {
+      const parts = mode.split("から");
+      const from = parts[0].replace("進数", "");
+      const to = parts[1].replace("進数", "");
+      return `${from}»${to}進数`;
+    }
+    return mode;
+  };
+
+  const getDifficultyName = (difficultyId: string): string => {
+    const difficulty = difficultyLevels.find(level => level.id === difficultyId);
+    return difficulty ? difficulty.displayName : difficultyId;
+  };
   
   useEffect(() => {
     const rankingData = getRankingData();
@@ -107,6 +160,13 @@ export const RankingList: React.FC<RankingListProps> = ({ className }) => {
       setSortDirection("desc");
     }
   };
+
+  const calculateRank = (index: number, totalItems: number) => {
+    if (sortDirection === "asc") {
+      return totalItems - index;
+    }
+    return index + 1;
+  };
   
   const sortedRankings = [...filteredRankings].sort((a, b) => {
     let compareValueA, compareValueB;
@@ -140,6 +200,10 @@ export const RankingList: React.FC<RankingListProps> = ({ className }) => {
         } else {
           return compareValueB - compareValueA;
         }
+      case "mode":
+        compareValueA = `${a.mode}-${a.difficulty}`;
+        compareValueB = `${b.mode}-${b.difficulty}`;
+        break;
       default:
         return 0;
     }
@@ -212,8 +276,8 @@ export const RankingList: React.FC<RankingListProps> = ({ className }) => {
               onClick={() => toggleDifficultyFilter(level.id)}
               className={`px-2 py-1 text-xs rounded-full transition-colors ${
                 difficultyFilter === level.id 
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-200 hover:bg-gray-300 text-gray-800"
+                  ? getDifficultyColor(level.id, "button", true)
+                  : getDifficultyColor(level.id, "button", false)
               }`}
             >
               {level.displayName}
@@ -227,7 +291,9 @@ export const RankingList: React.FC<RankingListProps> = ({ className }) => {
               フィルター: 
               {modeFilter && <span className="ml-1 font-medium">{modeFilter}</span>}
               {difficultyFilter && (
-                <span className="ml-1 font-medium">
+                <span className={`ml-1 font-medium px-1.5 py-0.5 rounded ${
+                  getDifficultyColor(difficultyFilter, "bg")} ${getDifficultyColor(difficultyFilter, "text")
+                }`}>
                   {difficultyLevels.find(level => level.id === difficultyFilter)?.displayName}
                 </span>
               )}
@@ -247,53 +313,71 @@ export const RankingList: React.FC<RankingListProps> = ({ className }) => {
       </div>
       
       <div className="overflow-x-auto">
-        <table className="min-w-full border-collapse">
-        <thead>
-          <tr className="bg-gray-100">
-            <th 
-              className="py-2 px-3 text-left cursor-pointer hover:bg-gray-200"
-              onClick={() => handleSort("rank")}
-            >
-              順位 {getSortIcon("rank")}
-            </th>
-            <th 
-              className="py-2 px-3 text-left cursor-pointer hover:bg-gray-200"
-              onClick={() => handleSort("name")}
-            >
-              名前 {getSortIcon("name")}
-            </th>
-            <th 
-              className="py-2 px-3 text-left cursor-pointer hover:bg-gray-200"
-              onClick={() => handleSort("correct")}
-            >
-              正誤 {getSortIcon("correct")}
-            </th>
-            <th 
-              className="py-2 px-3 text-left cursor-pointer hover:bg-gray-200"
-              onClick={() => handleSort("score")}
-            >
-              スコア {getSortIcon("score")}
-            </th>
-            <th 
-              className="py-2 px-3 text-left cursor-pointer hover:bg-gray-200"
-              onClick={() => handleSort("time")}
-            >
-              時間 {getSortIcon("time")}
-            </th>
-          </tr>
-        </thead>
+        <table className="min-w-full border-collapse table-auto">
+          <thead>
+            <tr className="bg-gray-100">
+              <th 
+                className="py-2 px-3 text-left cursor-pointer hover:bg-gray-200 whitespace-nowrap"
+                onClick={() => handleSort("rank")}
+              >
+                順位 {getSortIcon("rank")}
+              </th>
+              <th 
+                className="py-2 px-3 text-left cursor-pointer hover:bg-gray-200 whitespace-nowrap"
+                onClick={() => handleSort("name")}
+              >
+                名前 {getSortIcon("name")}
+              </th>
+              <th 
+                className="py-2 px-3 text-left cursor-pointer hover:bg-gray-200 whitespace-nowrap"
+                onClick={() => handleSort("score")}
+              >
+                スコア {getSortIcon("score")}
+              </th>
+              <th 
+                className="py-2 px-3 text-left cursor-pointer hover:bg-gray-200 whitespace-nowrap"
+                onClick={() => handleSort("correct")}
+              >
+                正誤 {getSortIcon("correct")}
+              </th>
+              <th 
+                className="py-2 px-3 text-left cursor-pointer hover:bg-gray-200 whitespace-nowrap"
+                onClick={() => handleSort("time")}
+              >
+                時間 {getSortIcon("time")}
+              </th>
+              <th 
+                className="py-2 px-3 text-left cursor-pointer hover:bg-gray-200 whitespace-nowrap"
+                onClick={() => handleSort("mode")}
+              >
+                難易度 {getSortIcon("mode")}
+              </th>
+            </tr>
+          </thead>
           <tbody>
-            {sortedRankings.map((ranking) => (
-              <tr key={ranking.rank} className={ranking.rank % 2 === 0 ? "bg-gray-50" : ""}>
-                <td className="py-2 px-3 font-bold">{ranking.rank}</td>
-                <td className="py-2 px-3">{ranking.name}</td>
-                <td className="py-2 px-3 text-center">
+            {sortedRankings.map((ranking, index) => (
+              <tr key={index} className={index % 2 === 0 ? "bg-gray-50" : ""}>
+                <td className="py-2 px-3 font-bold whitespace-nowrap">
+                  {calculateRank(index, sortedRankings.length)}
+                </td> 
+                <td className="py-2 px-3 whitespace-nowrap">{ranking.name}</td>
+                <td className="py-2 px-3 whitespace-nowrap">{ranking.score}</td>
+                <td className="py-2 px-3 text-center whitespace-nowrap">
                   {ranking.correctAnswers !== undefined && ranking.totalQuestions !== undefined 
                     ? `${ranking.correctAnswers}/${ranking.totalQuestions}`
                     : "N/A"}
                 </td>
-                <td className="py-2 px-3">{ranking.score}</td>
-                <td className="py-2 px-3">{formatTime(ranking.time)}</td>
+                <td className="py-2 px-3 whitespace-nowrap">{formatTime(ranking.time)}</td>
+                <td className="py-2 px-3 whitespace-nowrap">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">{formatMode(ranking.mode)}</span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full inline-block w-fit mt-1 ${
+                      getDifficultyColor(ranking.difficulty, "bg")} ${getDifficultyColor(ranking.difficulty, "text")
+                    }`}>
+                      {getDifficultyName(ranking.difficulty)}
+                    </span>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
