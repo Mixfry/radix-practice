@@ -4,13 +4,13 @@ import { useState, useEffect, useRef } from "react";
 import { GameScreen } from "../components/GameScreen";
 import { Selector } from "../components/Selector";
 import { Modal } from "../components/Modal";
-import { generateQuestions, handleInputChange, handleKeyDown } from "../utils/game";
+import { generateNextQuestion, generateQuestions, handleInputChange, handleKeyDown } from "../utils/game";
 import { RankingList } from "../components/Ranking";
 import { RankingInputModalContent } from "../components/RankingModal";
 import { formatTime } from "../utils/format";
 import { calculateScore } from "../utils/score";
 import { handleRankingRegistration } from "../utils/ranking";
-import { startTimer, stopTimer, pauseTimer, resumeTimer } from "../utils/stopWatch";
+import { startTimer, stopTimer, startTimerCountdown } from "../utils/stopWatch";
 
 export default function Home() {
   const modes = [
@@ -41,11 +41,10 @@ export default function Home() {
   const [elapsedTime, setElapsedTime] = useState(0); 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const [isTimerPaused, setIsTimerPaused] = useState(false);
-  const timerPausedAtRef = useRef<number>(0);
   const [isNameInputModalOpen, setIsNameInputModalOpen] = useState(false);
   const [playerName, setPlayerName] = useState("");
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [mistakes, setMistakes] = useState(0);
 
   useEffect(() => {
     const savedMode = localStorage.getItem("selectedMode");
@@ -82,14 +81,14 @@ export default function Home() {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    setElapsedTime(0);
-    setIsTimerPaused(false);
+    setElapsedTime(questionCount === "タイムアタック(1分)" ? 60000 : 0);
     
     const newQuestions = generateQuestions(mode, questionCount, difficultyLevel);
     setQuestions(newQuestions);
     setGameStarted(true);
     setCurrentQuestionIndex(0);
     setScore(0);
+    setMistakes(0);
     setFeedback(null);
     setUserAnswers([""]);
     
@@ -102,6 +101,8 @@ export default function Home() {
           clearInterval(countdownInterval);
           if (questionCount === "10問" && !timerRef.current) {
             startTimer(setElapsedTime, timerRef);
+          } else if (questionCount === "タイムアタック(1分)" && !timerRef.current) {
+            startTimerCountdown(setElapsedTime, timerRef, handleTimeUp);
           }
           return null;
         }
@@ -110,7 +111,7 @@ export default function Home() {
     }, 1000);
   };
 
-    const handleAnswerSubmit = () => {
+  const handleAnswerSubmit = () => {
     const userAnswer = userAnswers.join("").replace(/\s/g, "");
     
     let correctAnswer = questions[currentQuestionIndex].answer.replace(/\s/g, "");
@@ -118,48 +119,64 @@ export default function Home() {
     if (mode.includes("16進数") || (mode.includes("10進数から") && !mode.includes("2進数"))) {
       correctAnswer = correctAnswer.toUpperCase();
     }
-    
-    if (timerRef.current) {
-      pauseTimer(timerRef, setIsTimerPaused, elapsedTime, timerPausedAtRef);
-    }
   
     const normalizedUserAnswer = (mode.includes("16進数") || (mode.includes("10進数から") && !mode.includes("2進数"))) 
       ? userAnswer.toUpperCase() 
       : userAnswer;
     
-    if (normalizedUserAnswer === correctAnswer) {
-      setScore(score + 1);
-      setFeedback("正解！");
-    } else {
-      setFeedback(`不正解\n${questions[currentQuestionIndex].question}は${correctAnswer}でした！`);
-    }
-    setIsModalOpen(true);
-  };
+      if (normalizedUserAnswer === correctAnswer) {
+        setScore(score + 1);
+        setFeedback("正解！");
+      } else {
+        if (questionCount === "タイムアタック(1分)") {
+          setMistakes(mistakes + 1);
+        }
+        setFeedback(`不正解\n${questions[currentQuestionIndex].question}は${correctAnswer}でした！`);
+      }
+      setIsModalOpen(true);
+    };
   
   const handleNextQuestion = () => {
     setFeedback(null);
     setUserAnswers([""]);
     setIsModalOpen(false);
     
-    if (currentQuestionIndex + 1 < questions.length) {
+    if (questionCount === "タイムアタック(1分)" && currentQuestionIndex + 1 >= questions.length) {
+      const nextQuestion = generateNextQuestion(mode, difficultyLevel);
+      setQuestions([...questions, nextQuestion]);
       setCurrentQuestionIndex(currentQuestionIndex + 1);
-      if (isTimerPaused && questionCount === "10問") {
-        resumeTimer(isTimerPaused, timerRef, setElapsedTime, setIsTimerPaused);
-      }
+    } else if (currentQuestionIndex + 1 < questions.length) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
       stopTimer(timerRef);
       setIsResultModalOpen(true);
     }
   };
 
+  const handleTimeUp = () => {
+    stopTimer(timerRef);
+    setIsResultModalOpen(true);
+  };
+
   const getCurrentScore = () => {
-    return calculateScore(
-      score,
-      questions.length,
-      elapsedTime,
-      difficultyLevel,
-      difficultyLevels.map(level => level.id)
-    );
+    if (questionCount === "タイムアタック(1分)") {
+      const correctPoints = score * 100;
+      const incorrectPoints = mistakes * -20; 
+      
+      let difficultyMultiplier = 1;
+      if (difficultyLevel === difficultyLevels[1].id) difficultyMultiplier = 2;
+      if (difficultyLevel === difficultyLevels[2].id) difficultyMultiplier = 3;
+      
+      return Math.max(0, (correctPoints + incorrectPoints) * difficultyMultiplier);
+    } else {
+      return calculateScore(
+        score,
+        questions.length,
+        elapsedTime,
+        difficultyLevel,
+        difficultyLevels.map(level => level.id)
+      );
+    }
   };
 
   const registerToRanking = () => {
@@ -167,6 +184,10 @@ export default function Home() {
   };
 
   const handleSaveToRanking = () => {
+    const actualTotalQuestions = questionCount === "タイムアタック(1分)" 
+      ? currentQuestionIndex
+      : questions.length; 
+  
     handleRankingRegistration(
       playerName,
       getCurrentScore(),
@@ -174,7 +195,7 @@ export default function Home() {
       difficultyLevel,
       elapsedTime,
       score,
-      questions.length,
+      actualTotalQuestions,
       setIsNameInputModalOpen,
       setIsResultModalOpen,
       setGameStarted,
@@ -199,12 +220,16 @@ export default function Home() {
         <div className="fixed top-0 left-0 w-full h-2 bg-gray-200">
           <div
             className="h-full bg-blue-500 transition-all"
-            style={{ width: `${progressPercentage}%` }}
+            style={{ 
+              width: questionCount === "タイムアタック(1分)" 
+                ? `${(1 - elapsedTime / 60000) * 100}%` 
+                : `${progressPercentage}%` 
+            }}
           ></div>
         </div>
-  
+
         {/* ストップウォッチ */}
-        {questionCount === "10問" && (
+        {(questionCount === "10問" || questionCount === "タイムアタック(1分)") && (
           <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-white px-4 py-2 rounded shadow-lg flex flex-col items-center">
             <p className="text-lg font-mono">{formatTime(elapsedTime)}</p>
           </div>
@@ -235,6 +260,7 @@ export default function Home() {
             isBinaryInput={currentMode?.BinaryInput || false}
             mode={mode}
             countdown={countdown} 
+            isTimeAttack={questionCount === "タイムアタック(1分)"}
           />
         </div>
 
@@ -275,7 +301,11 @@ export default function Home() {
           className="p-6 rounded shadow-lg bg-blue-100"
         >
           <h2 className="text-xl font-bold">結果</h2>
-          <p className="text-lg mt-2">正誤: {score}/{questions.length}</p>
+          {questionCount === "タイムアタック(1分)" ? (
+            <p className="text-lg mt-2">正誤: {score}/{currentQuestionIndex}</p>
+          ) : (
+            <p className="text-lg mt-2">正誤: {score}/{questions.length}</p>
+          )}
           <p className="text-lg mt-2">かかった時間: {formatTime(elapsedTime)}</p>
           
           <p className="text-xl font-bold mt-4">スコア: {getCurrentScore()}</p>

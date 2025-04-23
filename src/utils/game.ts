@@ -27,24 +27,33 @@ const modeHandlers: Record<
 };
 
 export const generateQuestions = (mode: string, questionCount: string, difficulty: string) => {
-  const count = questionCount === "free" ? 10 : parseInt(questionCount, 10);
-
-  /*
-  * 難易度に応じて出題される数字の数が大きくなる!
-  * 初級: ~15, 1111
-  * 中級: ~255, 1111 1111
-  * 上級: ~4095, 1111 1111 1111
-  */
-  const maxNumber = difficulty === "beginner" 
-    ? 15 
-    : difficulty === "intermediate" 
-    ? 255 
-    : 4095; 
-
+  const count = questionCount === "タイムアタック(1分)" ? 100 : 
+                questionCount === "free" ? 10 : 
+                parseInt(questionCount, 10);
+  
+  /* 
+   * 難易度に応じて出題される数字の数が大きくなる!
+   * 初級: ~15, 1111
+   * 中級: ~255, 1111 1111
+   * 上級: ~4095, 1111 1111 1111
+   */
+  const maxNumber = difficulty === "beginner" ? 15 : 
+                    difficulty === "intermediate" ? 255 : 
+                    4095;
+  
   return Array.from({ length: count }, () => {
-    const randomNumber = Math.floor(Math.random() * (maxNumber + 1)); 
+    const randomNumber = Math.floor(Math.random() * (maxNumber + 1));
     return modeHandlers[mode](randomNumber);
   });
+};
+
+export const generateNextQuestion = (mode: string, difficulty: string) => {
+  const maxNumber = difficulty === "beginner" ? 15 : 
+                   difficulty === "intermediate" ? 255 : 
+                   4095;
+  
+  const randomNumber = Math.floor(Math.random() * (maxNumber + 1));
+  return modeHandlers[mode](randomNumber);
 };
 
 export const handleInputChange = (

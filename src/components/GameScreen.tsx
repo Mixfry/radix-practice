@@ -14,6 +14,7 @@ interface GameScreenProps {
   feedback: string | null;
   mode: string;
   countdown: number | null;
+  isTimeAttack: boolean;
 }
 
 export const GameScreen: React.FC<GameScreenProps> = ({
@@ -27,6 +28,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
   isBinaryInput,
   mode,
   countdown,
+  isTimeAttack,
 }) => {
   const isInputEmpty = userAnswers.every((answer) => answer.trim() === "");
   const [usingNumpad, setUsingNumpad] = useState(false);
@@ -88,16 +90,18 @@ export const GameScreen: React.FC<GameScreenProps> = ({
       }
     }
   };
-
+  
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <div className="flex flex-col items-center gap-6 p-8 bg-white rounded shadow-lg -mt-32">
-        <p className="text-lg">
-          問題 {currentQuestionIndex + 1}/{questions.length}
-        </p>
+        {isTimeAttack ? (
+          <p className="text-lg">問題 {currentQuestionIndex + 1}問目</p>
+        ) : (
+          <p className="text-lg">問題 {currentQuestionIndex + 1}/{questions.length}</p>
+        )}
         
-        {countdown === null ? (
-          <p className="text-lg">{getTargetBase(mode)}進数に変換: {questions[currentQuestionIndex].question}</p>
+        {countdown === null && questions && questions.length > 0 && currentQuestionIndex < questions.length ? (
+          <p className="text-lg">{getTargetBase(mode)}進数に変換: {questions[currentQuestionIndex]?.question || ""}</p>
         ) : (
           <p className="text-lg">{getTargetBase(mode)}進数に変換: <span className="opacity-0">問題準備中...</span></p>
         )}

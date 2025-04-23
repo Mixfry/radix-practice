@@ -167,6 +167,20 @@ export const RankingList: React.FC<RankingListProps> = ({ className }) => {
     }
     return index + 1;
   };
+
+  const isTimeAttackMode = (item: RankingItem) => {
+    return item.totalQuestions !== 10; 
+  };
+  
+  const getDisplayTime = (ranking: RankingItem) => {
+    if (isTimeAttackMode(ranking) && ranking.totalQuestions > 0) {
+      const secondsPerQuestion = 60 / ranking.totalQuestions;
+      const formattedSeconds = secondsPerQuestion.toFixed(2);
+      return `${formattedSeconds}秒`;
+    } else {
+      return formatTime(ranking.time);
+    }
+  };
   
   const sortedRankings = [...filteredRankings].sort((a, b) => {
     let compareValueA, compareValueB;
@@ -193,12 +207,25 @@ export const RankingList: React.FC<RankingListProps> = ({ className }) => {
         compareValueB = b.score;
         break;
       case "time":
-        compareValueA = a.time;
-        compareValueB = b.time;
-        if (sortDirection === "desc") {
-          return compareValueA - compareValueB; 
+        if (isTimeAttackMode(a) && isTimeAttackMode(b) && a.totalQuestions > 0 && b.totalQuestions > 0) {
+          compareValueA = 60 / a.totalQuestions;
+          compareValueB = 60 / b.totalQuestions;
         } else {
-          return compareValueB - compareValueA;
+          compareValueA = a.time;
+          compareValueB = b.time;
+        }
+        if (sortDirection === "desc") {
+          if (isTimeAttackMode(a) && isTimeAttackMode(b)) {
+            return compareValueB - compareValueA;
+          } else {
+            return compareValueA - compareValueB;
+          }
+        } else {
+          if (isTimeAttackMode(a) && isTimeAttackMode(b)) {
+            return compareValueA - compareValueB;
+          } else {
+            return compareValueB - compareValueA;
+          }
         }
       case "mode":
         compareValueA = `${a.mode}-${a.difficulty}`;
@@ -344,7 +371,8 @@ export const RankingList: React.FC<RankingListProps> = ({ className }) => {
                 className="py-2 px-3 text-left cursor-pointer hover:bg-gray-200 whitespace-nowrap"
                 onClick={() => handleSort("time")}
               >
-                時間 {getSortIcon("time")}
+                {questionCountFilter === "タイムアタック" ? "1問あたりの時間" : "時間 "}
+                {getSortIcon("time")}
               </th>
               <th 
                 className="py-2 px-3 text-left cursor-pointer hover:bg-gray-200 whitespace-nowrap"
@@ -367,7 +395,7 @@ export const RankingList: React.FC<RankingListProps> = ({ className }) => {
                     ? `${ranking.correctAnswers}/${ranking.totalQuestions}`
                     : "N/A"}
                 </td>
-                <td className="py-2 px-3 whitespace-nowrap">{formatTime(ranking.time)}</td>
+                <td className="py-2 px-3 whitespace-nowrap">{getDisplayTime(ranking)}</td>
                 <td className="py-2 px-3 whitespace-nowrap">
                   <div className="flex flex-col">
                     <span className="text-sm font-medium">{formatMode(ranking.mode)}</span>

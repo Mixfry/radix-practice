@@ -1,4 +1,4 @@
-import { Dispatch, RefObject, SetStateAction } from "react";
+import { RefObject, } from "react";
 
 export const startTimer = (setElapsedTime: React.Dispatch<React.SetStateAction<number>>, timerRef: React.MutableRefObject<NodeJS.Timeout | null>) => {
   if (timerRef.current) {
@@ -21,30 +21,25 @@ export const stopTimer = (
   }
 };
 
-export const pauseTimer = (
-  timerRef: RefObject<NodeJS.Timeout | null>,
-  setIsTimerPaused: Dispatch<SetStateAction<boolean>>,
-  elapsedTime: number,
-  timerPausedAtRef: RefObject<number>
+//　タイムアタック用
+export const startTimerCountdown = (
+  setElapsedTime: React.Dispatch<React.SetStateAction<number>>, 
+  timerRef: React.MutableRefObject<NodeJS.Timeout | null>,
+  onTimeUp: () => void
 ) => {
   if (timerRef.current) {
     clearInterval(timerRef.current);
-    timerRef.current = null;
-    setIsTimerPaused(true);
-    timerPausedAtRef.current = elapsedTime;
   }
-};
-
-export const resumeTimer = (
-  isTimerPaused: boolean,
-  timerRef: RefObject<NodeJS.Timeout | null>,
-  setElapsedTime: Dispatch<SetStateAction<number>>,
-  setIsTimerPaused: Dispatch<SetStateAction<boolean>>
-) => {
-  if (isTimerPaused) {
-    timerRef.current = setInterval(() => {
-      setElapsedTime((prev) => prev + 100);
-    }, 100);
-    setIsTimerPaused(false);
-  }
+  
+  timerRef.current = setInterval(() => {
+    setElapsedTime((prev) => {
+      if (prev <= 100) {
+        clearInterval(timerRef.current!);
+        timerRef.current = null;
+        onTimeUp();
+        return 0;
+      }
+      return prev - 100;
+    });
+  }, 100);
 };
