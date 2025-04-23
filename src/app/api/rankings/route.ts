@@ -36,14 +36,28 @@ export async function POST(request: Request) {
       totalQuestions 
     } = body;
     
-    const isTimeAttack = totalQuestions !== 10;
+    const { rows: exactMatch } = await sql`
+      SELECT * FROM rankings 
+      WHERE name = ${name} 
+        AND mode = ${mode} 
+        AND difficulty = ${difficulty}
+        AND total_questions = ${totalQuestions}
+        AND score = ${score}
+    `;
+    
+    if (exactMatch.length > 0) {
+      return NextResponse.json({ 
+        success: true,
+        message: `同じ記録が既に登録されています！(${score})`
+      });
+    }
     
     const { rows } = await sql`
       SELECT * FROM rankings 
       WHERE name = ${name} 
         AND mode = ${mode} 
         AND difficulty = ${difficulty}
-        AND (total_questions != 10) = ${isTimeAttack}
+        AND total_questions = ${totalQuestions === 10 ? 10 : totalQuestions}
       ORDER BY score DESC
       LIMIT 1
     `;
@@ -55,13 +69,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ 
           success: true,
           message: `前回の記録の方が良いスコアです！(${existingEntry.score} > ${score})\n今回の記録は保存されません`
-        });
-      }
-      
-      if (existingEntry.score === score) {
-        return NextResponse.json({ 
-          success: true,
-          message: `同じスコアが既に登録されています！(${score})`
         });
       }
       
