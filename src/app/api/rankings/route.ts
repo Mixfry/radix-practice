@@ -47,8 +47,7 @@ export async function POST(request: Request) {
     
     if (exactMatch.length > 0) {
       return NextResponse.json({ 
-        success: true,
-        message: `同じ記録が既に登録されています！(${score})`
+        success: true
       });
     }
     
