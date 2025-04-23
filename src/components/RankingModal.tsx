@@ -1,48 +1,62 @@
-import React from "react";
+import React, { FormEvent } from 'react';
 
-interface RankingInputModalContentProps {
+interface RankingModalProps {
   playerName: string;
   setPlayerName: (name: string) => void;
   onSave: () => void;
   onCancel: () => void;
+  isSubmitting?: boolean; 
 }
 
-export const RankingInputModalContent: React.FC<RankingInputModalContentProps> = ({
+export const RankingInputModalContent: React.FC<RankingModalProps> = ({
   playerName,
   setPlayerName,
   onSave,
-  onCancel
+  onCancel,
+  isSubmitting = false 
 }) => {
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    onSave();
+  };
+
   return (
-    <>
-      <h2 className="text-xl font-bold">ランキング登録</h2>
-      <p className="text-md mt-2">あなたの名前を入力してください</p>
-      
-      <input
-        type="text"
-        value={playerName}
-        onChange={(e) => setPlayerName(e.target.value)}
-        className="w-full p-2 border rounded mt-4"
-        placeholder="名前を入力"
-        maxLength={10}
-      />
-      
-      <div className="flex justify-between mt-4">
-        <button
-          onClick={onCancel}
-          className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-        >
-          キャンセル
-        </button>
-        
-        <button
-          onClick={onSave}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          disabled={!playerName.trim()}
-        >
-          登録
-        </button>
-      </div>
-    </>
+    <div className="flex flex-col gap-4">
+      <h2 className="text-lg font-bold">ランキングに名前を登録</h2>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <div>
+          <label htmlFor="playerName" className="block mb-1">名前</label>
+          <input
+            id="playerName"
+            type="text"
+            value={playerName}
+            onChange={(e) => setPlayerName(e.target.value)}
+            placeholder="名前を入力してください"
+            className="px-3 py-2 border rounded w-full"
+            disabled={isSubmitting}
+            maxLength={20}
+          />
+        </div>
+        <div className="flex gap-2 justify-end">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+            disabled={isSubmitting}
+          >
+            キャンセル
+          </button>
+          <button
+            type="submit"
+            className={`px-3 py-1 bg-blue-500 text-white rounded ${
+              isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'
+            }`}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? '登録中...' : '登録する'}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 };

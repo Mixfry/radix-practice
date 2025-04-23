@@ -45,6 +45,7 @@ export default function Home() {
   const [playerName, setPlayerName] = useState("");
   const [countdown, setCountdown] = useState<number | null>(null);
   const [mistakes, setMistakes] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const setupDatabase = async () => {
@@ -202,24 +203,36 @@ export default function Home() {
     setIsNameInputModalOpen(true);
   };
 
-  const handleSaveToRanking = () => {
-    const actualTotalQuestions = questionCount === "タイムアタック(1分)" 
-      ? currentQuestionIndex
-      : questions.length; 
-  
-    handleRankingRegistration(
       playerName,
-      getCurrentScore(),
-      mode,
-      difficultyLevel,
-      elapsedTime,
-      score,
-      actualTotalQuestions,
-      setIsNameInputModalOpen,
-      setIsResultModalOpen,
-      setGameStarted,
-      setPlayerName
-    );
+  const handleSaveToRanking = async () => {
+    if (isSubmitting) return;
+    
+    setIsSubmitting(true);
+    
+    try {
+      const result = await handleRankingRegistration(
+        playerName,
+        getCurrentScore(),
+        mode,
+        difficultyLevel,
+        elapsedTime,
+        score,
+        questionCount === "タイムアタック(1分)" ? currentQuestionIndex : questions.length,
+        setIsNameInputModalOpen,
+        setIsResultModalOpen,
+        setGameStarted,
+        setPlayerName
+      );
+      
+      setIsSubmitting(false);
+      
+      if (result) {
+
+      }
+    } catch (error) {
+      setIsSubmitting(false);
+      console.error('ランキング登録エラー:', error);
+    }
   };
 
   if (gameStarted) {
@@ -360,14 +373,23 @@ export default function Home() {
         {/* ランキングの名前入力 */}
         <Modal
           isOpen={isNameInputModalOpen}
-          onClose={() => setIsNameInputModalOpen(false)}
+          onClose={() => {
+            if (!isSubmitting) {
+              setIsNameInputModalOpen(false);
+            }
+          }}
           className="p-6 rounded shadow-lg bg-white"
         >
           <RankingInputModalContent
             playerName={playerName}
             setPlayerName={setPlayerName}
             onSave={handleSaveToRanking}
-            onCancel={() => setIsNameInputModalOpen(false)}
+            onCancel={() => {
+              if (!isSubmitting) {
+                setIsNameInputModalOpen(false);
+              }
+            }}
+            isSubmitting={isSubmitting}
           />
         </Modal>
       </>
