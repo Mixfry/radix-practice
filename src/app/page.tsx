@@ -298,7 +298,7 @@ export default function Home() {
         />
         <Selector
           title="難易度を選択"
-          gridCols={1}
+          gridCols={3}
           items={difficultyLevels}
           selectedItem={difficultyLevels.find(level => level.id === difficultyLevel)!}
           onSelectItem={handleDifficultyLevelSelect}
